@@ -3,7 +3,11 @@ import re
 import time
 import matplotlib.pyplot as plt
 import numpy as np
-from load_graph import *  
+from utils.load_graph import *  
+
+
+PROJECT_ROOT = os.path.join(os.path.dirname(os.getcwd()), 'impovement-on-algos-by-quantum-approach')
+BASE_DIR = os.path.join(PROJECT_ROOT, ".dataset")
 
 def get_available_sizes(base_dir, graph_type):
     dir_path = os.path.join(base_dir, graph_type)
@@ -21,7 +25,7 @@ def get_available_sizes(base_dir, graph_type):
     return sorted(list(sizes))
 
 
-def run_experiment(algorithms_dict, graph_types=['sparse', 'dense'], base_dir=".dataset"):
+def run_experiment(algorithms_dict, graph_types=['sparse', 'dense'], base_dir=BASE_DIR):
     results = {}
     
     for algo_name in algorithms_dict.keys():
@@ -33,8 +37,13 @@ def run_experiment(algorithms_dict, graph_types=['sparse', 'dense'], base_dir=".
             print(f"Папка {dir_path} не найдена.")
             continue
             
-        available_sizes = sorted([int(f.split('_')[1][1:]) for f in os.listdir(dir_path) 
-                                  if f.startswith('graph_n') and f.endswith('.txt')])
+        pattern = re.compile(r"graph_n(\d+)_")
+        available_sizes = sorted([
+            int(match.group(1)) 
+            for f in os.listdir(dir_path) 
+            if f.startswith('graph_n') and f.endswith('.txt') 
+            and (match := pattern.search(f))
+        ])
         
         for n in available_sizes:
             target_files = [f for f in os.listdir(dir_path) if f.startswith(f"graph_n{n}_")]
@@ -72,7 +81,7 @@ def plot_time(results, graph_types=['sparse', 'dense']):
     if num_algos == 0: 
         return
     
-    algo_colors =  ['red', 'darkblue']
+    algo_colors =  ['red', 'darkblue', 'coral', 'lightblue', 'gold', 'black']
     algo_names = list(results.keys())
 
     for g_type in graph_types:
@@ -120,7 +129,7 @@ def plot_results(results, graph_types=['sparse', 'dense'], title_prefix="Сра�
     if num_algos == 0: 
         return
     
-    algo_colors = ['red', 'darkblue']
+    algo_colors = ['red', 'darkblue', 'coral', 'lightblue', 'gold', 'black']
     algo_names = list(results.keys())
 
     for g_type in graph_types:
@@ -153,51 +162,3 @@ def plot_results(results, graph_types=['sparse', 'dense'], title_prefix="Сра�
             plt.show()
         else:
             print(f"Нет данных для типа графа: {g_type}")
-
-
-def plot_speedup_ratio(results, ref_algo_name, test_algo_name, graph_types=['sparse', 'dense']):
-    colors = {'sparse': 'green', 'dense': 'red'}
-    
-    for g_type in graph_types:
-        plt.figure(figsize=(10, 6))
-        
-        if g_type in results[ref_algo_name] and g_type in results[test_algo_name]:
-            raw_ref = results[ref_algo_name][g_type]
-            raw_test = results[test_algo_name][g_type]
-            
-            ratios_by_n = {}
-            
-            for d_ref in raw_ref:
-                n = d_ref['n']
-                ops_r = d_ref['ops']
-                
-                candidates = [d_t for d_t in raw_test if d_t['n'] == n]
-                
-                if not candidates: continue
-                
-                for d_t in candidates:
-                    ops_t = d_t['ops']
-                    ratio = ops_r / ops_t if ops_t > 0 else 1.0
-                    
-                    if n not in ratios_by_n:
-                        ratios_by_n[n] = []
-                    ratios_by_n[n].append(ratio)
-            
-            ns_sorted = sorted(ratios_by_n.keys())
-            avg_ratios = [np.mean(ratios_by_n[n]) for n in ns_sorted]
-            
-            label = f"{'Разреженный' if g_type=='sparse' else 'Плотный'}"
-            plt.plot(ns_sorted, avg_ratios, marker='s', linestyle='--', 
-                     color=colors.get(g_type, 'blue'), label=label, linewidth=2)
-            
-            plt.axhline(y=1, color='black', linestyle=':', linewidth=1)
-            type_label = "Разреженные графы" if g_type == 'sparse' else "Плотные графы"
-            plt.title(f"Выигрыш {test_algo_name} над {ref_algo_name}\n({type_label})")
-            plt.xlabel('Вершины (V)')
-            plt.ylabel('Коэффициент ускорения (Classic Ops / Quantum Ops)')
-            plt.legend()
-            plt.grid(True, linestyle='--', alpha=0.7)
-            plt.tight_layout()
-            plt.show()
-        else:
-            print(f"Нет данных для построения графика ускорения ({g_type}).")
